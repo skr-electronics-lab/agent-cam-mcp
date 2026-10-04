@@ -161,7 +161,7 @@ class MCPToolExecutor:
                 tool=name,
                 parameters=arguments,
                 duration_ms=duration_ms,
-                status="error" if res.isError else "success",
+                status="error" if getattr(res, "isError", getattr(res, "is_error", False)) else "success",
                 image_bytes=preview_bytes,
                 result_summary=summary,
             )
