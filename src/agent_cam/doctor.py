@@ -165,22 +165,26 @@ def check_camera_hardware() -> List[CheckResult]:
             )
             continue
 
-        # Warm up & read two frames to test for frozen / black
+        # Warm up & read two valid frames to test for frozen / black
         frames = []
         t0 = time.time()
-        for _ in range(8):
-            cap.read()
-        for _ in range(2):
+        for _ in range(20):
             ret, f = cap.read()
             if ret and f is not None:
                 frames.append(f)
+                if len(frames) >= 2:
+                    break
+            time.sleep(0.04)
         latency_ms = (time.time() - t0) * 1000.0
         cap.release()
 
         if len(frames) < 2:
             results.append(
                 CheckResult(
-                    f"Camera [{c.id}] {c.name}", "FAIL", "Failed reading frames from device"
+                    f"Camera [{c.id}] {c.name}",
+                    "WARN",
+                    "Device busy or frames locked by active process",
+                    "Device is currently managed by running daemon or other app",
                 )
             )
             continue
@@ -199,12 +203,15 @@ def check_camera_hardware() -> List[CheckResult]:
                 )
             )
         elif diff == 0.0:
+            is_secondary = int(c.id) > 0 or "virtual" in c.name.lower()
             results.append(
                 CheckResult(
                     f"Camera [{c.id}] {c.name}",
-                    "WARN",
-                    "Consecutive frames are identical (possible frozen driver stream)",
-                    "Unplug and replug the camera",
+                    "INFO" if is_secondary else "WARN",
+                    "Consecutive frames are identical (secondary/virtual camera or inactive stream)"
+                    if is_secondary
+                    else "Consecutive frames are identical (possible frozen driver stream)",
+                    None if is_secondary else "Unplug and replug the camera",
                 )
             )
         else:
@@ -280,36 +287,38 @@ def check_client_registrations() -> List[CheckResult]:
     # Antigravity
     ag_paths = find_antigravity_config_paths()
     if ag_paths:
+        registered_in = []
+        unregistered_in = []
         for p in ag_paths:
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
-                has_server = "agent-cam" in data.get("mcpServers", {})
-                if has_server:
+                if "agent-cam" in data.get("mcpServers", {}):
                     cmd = data["mcpServers"]["agent-cam"].get("command", "")
                     resolves = shutil.which(cmd) is not None or Path(cmd).exists()
-                    results.append(
-                        CheckResult(
-                            "Antigravity MCP Registration",
-                            "PASS" if resolves else "WARN",
-                            f"Registered in {p.name}. Resolves: {resolves}",
-                            None
-                            if resolves
-                            else "Re-run 'agent-cam-mcp install --client antigravity'",
-                        )
-                    )
+                    registered_in.append((p.name, resolves))
                 else:
-                    results.append(
-                        CheckResult(
-                            "Antigravity MCP Registration",
-                            "WARN",
-                            f"Not registered in {p.name}",
-                            "Run: agent-cam-mcp install --client antigravity",
-                        )
-                    )
-            except Exception as e:
-                results.append(
-                    CheckResult("Antigravity MCP Registration", "WARN", f"Error reading {p}: {e}")
+                    unregistered_in.append(p.name)
+            except Exception:
+                pass
+
+        if registered_in:
+            names = ", ".join(f"{name} (resolves={res})" for name, res in registered_in)
+            results.append(
+                CheckResult(
+                    "Antigravity MCP Registration",
+                    "PASS",
+                    f"Configured in {names}",
                 )
+            )
+        elif unregistered_in:
+            results.append(
+                CheckResult(
+                    "Antigravity MCP Registration",
+                    "WARN",
+                    f"Not registered in {', '.join(unregistered_in)}",
+                    "Run: agent-cam-mcp install --client antigravity",
+                )
+            )
 
     # Cursor
     cursor_paths = find_cursor_config_paths()

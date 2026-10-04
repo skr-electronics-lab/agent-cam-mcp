@@ -102,6 +102,8 @@ class Region(BaseModel):
     h: float
     camera: Optional[str] = None
     units: RegionUnit = RegionUnit.NORMALIZED
+    points: Optional[List[List[float]]] = None  # 4-point quadrilateral [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+    parent: Optional[str] = None  # Parent region name for hierarchical groupings
 
 
 class PrivacyMask(BaseModel):
@@ -119,6 +121,8 @@ class CameraSettings(BaseModel):
     exposure: Optional[int] = None
     focus: Optional[int] = None
     brightness: Optional[int] = None
+    contrast: Optional[int] = None
+    gain: Optional[int] = None
     white_balance: Optional[int] = None
     lock_auto: Optional[bool] = None
 
@@ -140,6 +144,21 @@ class MeasureResult(BaseModel):
     motion_level: float
     width: int
     height: int
+    timestamp: float
+
+
+class LEDAnalysisResult(BaseModel):
+    camera: str
+    region: Optional[str] = None
+    state: str  # "off", "solid_on", "blinking"
+    frequency_hz: Optional[float] = None
+    duty_cycle: Optional[float] = None
+    color_name: str  # "red", "green", "blue", "amber", "cyan", "white", "off"
+    dominant_rgb: List[int]
+    mean_brightness: float
+    confidence: float
+    sample_count: int
+    duration_s: float
     timestamp: float
 
 

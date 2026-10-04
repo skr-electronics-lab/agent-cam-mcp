@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from agent_cam import __version__
 from agent_cam.config import AgentCamConfig
 from agent_cam.daemon import DaemonServer
 
@@ -23,7 +24,7 @@ def test_daemon_health(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == __version__
 
 
 def test_daemon_security_origin_validation(client):

@@ -178,13 +178,18 @@
   // Mode buttons
   const btnModeSelect = document.getElementById("mode-select");
   const btnModeDrawRegion = document.getElementById("mode-draw-region");
+  const btnModeDrawQuad = document.getElementById("mode-draw-quad");
   const btnModeDrawMask = document.getElementById("mode-draw-mask");
+  let quadPoints = [];
+  let mousePos = null;
 
   function setToolMode(mode) {
     activeTool = mode;
     btnModeSelect.classList.toggle("active", mode === "select");
     btnModeDrawRegion.classList.toggle("active", mode === "draw_region");
+    if (btnModeDrawQuad) btnModeDrawQuad.classList.toggle("active", mode === "draw_quad");
     btnModeDrawMask.classList.toggle("active", mode === "draw_mask");
+    quadPoints = [];
 
     if (mode === "select") {
       canvas.style.cursor = "default";
@@ -192,6 +197,9 @@
     } else if (mode === "draw_region") {
       canvas.style.cursor = "crosshair";
       document.getElementById("canvas-status-hint").textContent = "Mode: DRAW REGION. Click and drag to create a new inspection region.";
+    } else if (mode === "draw_quad") {
+      canvas.style.cursor = "crosshair";
+      document.getElementById("canvas-status-hint").textContent = "Mode: DRAW QUAD (Warp). Click 4 corners (TL, TR, BR, BL) on the surface.";
     } else if (mode === "draw_mask") {
       canvas.style.cursor = "crosshair";
       document.getElementById("canvas-status-hint").textContent = "Mode: PRIVACY MASK. Click and drag to permanently redact an area.";
@@ -201,6 +209,7 @@
 
   btnModeSelect.addEventListener("click", () => setToolMode("select"));
   btnModeDrawRegion.addEventListener("click", () => setToolMode("draw_region"));
+  if (btnModeDrawQuad) btnModeDrawQuad.addEventListener("click", () => setToolMode("draw_quad"));
   btnModeDrawMask.addEventListener("click", () => setToolMode("draw_mask"));
 
   // Zoom control
@@ -323,8 +332,49 @@
 
     // 2. Draw Defined Regions
     Object.values(definedRegions).forEach(reg => {
-      const b = getPixelBox(reg);
       const isSelected = reg.name === selectedRegionName;
+
+      if (reg.points && reg.points.length === 4) {
+        const pts = reg.points.map(p => ({
+          x: p[0] * canvas.width,
+          y: p[1] * canvas.height
+        }));
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = isSelected ? "#00D7FF" : "rgba(0, 215, 255, 0.75)";
+        ctx.lineWidth = isSelected ? 2 : 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = isSelected ? "rgba(0, 215, 255, 0.16)" : "rgba(0, 215, 255, 0.08)";
+        ctx.fill();
+
+        // Draw 4 corner pins
+        pts.forEach((pt) => {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, isSelected ? 5 : 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = isSelected ? "#FFFFFF" : "#00D7FF";
+          ctx.fill();
+          ctx.strokeStyle = "#007ACC";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+
+        // Badge label
+        ctx.fillStyle = isSelected ? "#00D7FF" : "rgba(0, 215, 255, 0.9)";
+        ctx.font = "11px " + getComputedStyle(document.body).fontFamily;
+        const text = ` [QUAD] ${reg.name} `;
+        const tw = ctx.measureText(text).width;
+        ctx.fillRect(pts[0].x, Math.max(0, pts[0].y - 16), tw + 4, 16);
+        ctx.fillStyle = "#000000";
+        ctx.fillText(text, pts[0].x + 2, Math.max(12, pts[0].y - 4));
+        return;
+      }
+
+      const b = getPixelBox(reg);
 
       // Box outline
       ctx.strokeStyle = isSelected ? "#3B82F6" : "rgba(59, 130, 246, 0.75)";
@@ -359,7 +409,31 @@
       }
     });
 
-    // 3. Draw active drawing box
+    // 3. Draw in-progress quad points
+    if (activeTool === "draw_quad" && quadPoints.length > 0) {
+      ctx.strokeStyle = "#00D7FF";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(quadPoints[0].x * canvas.width, quadPoints[0].y * canvas.height);
+      for (let i = 1; i < quadPoints.length; i++) {
+        ctx.lineTo(quadPoints[i].x * canvas.width, quadPoints[i].y * canvas.height);
+      }
+      if (mousePos) {
+        ctx.lineTo(mousePos.x, mousePos.y);
+      }
+      ctx.stroke();
+
+      quadPoints.forEach((pt, idx) => {
+        ctx.beginPath();
+        ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#00D7FF";
+        ctx.fill();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillText(String(idx + 1), pt.x * canvas.width + 8, pt.y * canvas.height - 4);
+      });
+    }
+
+    // 4. Draw active drawing box
     if (dragAction === "create" && currentRect) {
       ctx.strokeStyle = activeTool === "draw_mask" ? "#E5484D" : "#00D7FF";
       ctx.lineWidth = 1.5;
@@ -377,6 +451,26 @@
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
+
+    if (activeTool === "draw_quad") {
+      const normX = px / canvas.width;
+      const normY = py / canvas.height;
+      quadPoints.push({ x: normX, y: normY });
+      if (quadPoints.length === 4) {
+        document.getElementById("dialog-title").textContent = "Name 4-Point Quad Region";
+        dialogNameInput.value = "";
+        const parentInput = document.getElementById("dialog-region-parent");
+        if (parentInput) parentInput.value = "";
+        namingDialog.style.display = "flex";
+        namingDialog.style.top = Math.min(canvas.height - 140, Math.max(10, py)) + "px";
+        namingDialog.style.left = Math.min(canvas.width - 240, Math.max(10, px)) + "px";
+        dialogNameInput.focus();
+      } else {
+        document.getElementById("canvas-status-hint").textContent = `Quad: Point ${quadPoints.length}/4 placed. Click next corner.`;
+      }
+      renderCanvas();
+      return;
+    }
 
     if (activeTool === "select") {
       // Check handles of currently selected region first
@@ -411,6 +505,7 @@
         document.getElementById("inspector-region-select").value = selectedRegionName;
         renderCanvas();
         runMeasure(selectedRegionName);
+        updateRectifiedPreview(selectedRegionName);
         return;
       } else {
         // Deselect
@@ -418,6 +513,7 @@
         btnDeleteSelected.style.display = "none";
         document.getElementById("inspector-region-select").value = "";
         renderCanvas();
+        updateRectifiedPreview(null);
       }
     } else if (activeTool === "draw_region" || activeTool === "draw_mask") {
       dragAction = "create";
@@ -555,25 +651,45 @@
   // Floating Dialog Action Handlers
   document.getElementById("dialog-save-btn").addEventListener("click", async () => {
     const name = dialogNameInput.value.trim();
+    const parentInput = document.getElementById("dialog-region-parent");
+    const parent = parentInput ? parentInput.value.trim() || null : null;
+
     if (!name) {
       alert("Please enter a region name.");
       dialogNameInput.focus();
       return;
     }
     namingDialog.style.display = "none";
-    if (pendingRect) {
-      const norm = getNormBox(pendingRect);
-      await saveRegion(name, norm.x, norm.y, norm.w, norm.h);
+
+    if (activeTool === "draw_quad" && quadPoints.length === 4) {
+      const xs = quadPoints.map(p => p.x);
+      const ys = quadPoints.map(p => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      const pts = quadPoints.map(p => [p.x, p.y]);
+      quadPoints = [];
+      await saveRegion(name, minX, minY, maxX - minX, maxY - minY, pts, parent);
       selectedRegionName = name;
       btnDeleteSelected.style.display = "inline-block";
       setToolMode("select");
+      updateRectifiedPreview(name);
+    } else if (pendingRect) {
+      const norm = getNormBox(pendingRect);
+      pendingRect = null;
+      await saveRegion(name, norm.x, norm.y, norm.w, norm.h, null, parent);
+      selectedRegionName = name;
+      btnDeleteSelected.style.display = "inline-block";
+      setToolMode("select");
+      updateRectifiedPreview(name);
     }
-    pendingRect = null;
   });
 
   document.getElementById("dialog-cancel-btn").addEventListener("click", () => {
     namingDialog.style.display = "none";
     pendingRect = null;
+    quadPoints = [];
     renderCanvas();
   });
 
@@ -585,9 +701,19 @@
     }
   });
 
-  async function saveRegion(name, x, y, w, h) {
+  async function saveRegion(name, x, y, w, h, points = null, parent = null) {
     try {
-      const body = { name, x, y, w, h, camera: currentCameraId, units: "normalized" };
+      const body = {
+        name,
+        x,
+        y,
+        w,
+        h,
+        camera: currentCameraId,
+        units: "normalized",
+        points: points || undefined,
+        parent: parent || undefined,
+      };
       await api("/api/regions", { method: "POST", body: JSON.stringify(body) });
       await loadRegions();
     } catch (e) {
@@ -626,8 +752,12 @@
         li.style.border = "1px solid var(--border)";
         li.style.backgroundColor = r.name === selectedRegionName ? "var(--raised)" : "transparent";
 
+        const isQuad = r.points && r.points.length === 4;
+        const tag = isQuad ? "[QUAD]" : "[RECT]";
+        const parentTag = r.parent ? `<span style="font-size:10px; color:var(--muted); margin-left:4px;">(${r.parent})</span>` : "";
+
         li.innerHTML = `
-          <span style="font-weight:500; cursor:pointer;" class="region-item-name">[${r.name}]</span>
+          <span style="font-weight:500; cursor:pointer;" class="region-item-name"><span style="color:var(--accent); font-size:10px; margin-right:4px;">${tag}</span>${r.name}${parentTag}</span>
           <button class="btn btn-sm btn-danger" data-name="${r.name}">Del</button>
         `;
 
@@ -637,6 +767,7 @@
           inspectorSelect.value = r.name;
           renderCanvas();
           runMeasure(r.name);
+          updateRectifiedPreview(r.name);
         });
 
         li.querySelector("button").addEventListener("click", async (e) => {
@@ -724,6 +855,124 @@
   document.getElementById("btn-run-measure").addEventListener("click", () => {
     const regName = document.getElementById("inspector-region-select").value;
     runMeasure(regName);
+    updateRectifiedPreview(regName);
+  });
+
+  // Rectified Orthogonal View Preview
+  function updateRectifiedPreview(regName) {
+    const sec = document.getElementById("rectified-preview-section");
+    const img = document.getElementById("rectified-preview-img");
+    const lbl = document.getElementById("rectified-res-label");
+    if (!sec || !img) return;
+
+    if (!regName || !definedRegions[regName]) {
+      sec.style.display = "none";
+      return;
+    }
+    sec.style.display = "block";
+    img.src = `/api/regions/${encodeURIComponent(regName)}/rectified?t=${Date.now()}`;
+    img.onload = () => {
+      if (lbl) lbl.textContent = `${img.naturalWidth} x ${img.naturalHeight} px`;
+    };
+  }
+
+  document.getElementById("btn-refresh-rectified")?.addEventListener("click", () => {
+    if (selectedRegionName) updateRectifiedPreview(selectedRegionName);
+  });
+
+  // Live LED & Frequency Analyzer
+  document.getElementById("btn-run-led-analysis")?.addEventListener("click", async () => {
+    const btn = document.getElementById("btn-run-led-analysis");
+    const regName = selectedRegionName || document.getElementById("inspector-region-select").value || null;
+    btn.disabled = true;
+    btn.textContent = "Sampling (1.5s)...";
+    try {
+      const res = await api("/api/led/analyze", {
+        method: "POST",
+        body: JSON.stringify({
+          camera: currentCameraId || "0",
+          region: regName || undefined,
+          duration_s: 1.5,
+        }),
+      });
+      document.getElementById("led-state-label").textContent = (res.state || "OFF").toUpperCase();
+      document.getElementById("led-freq-label").textContent = res.frequency_hz ? `${res.frequency_hz} Hz` : "-- Hz";
+      document.getElementById("led-duty-label").textContent = res.duty_cycle ? `${res.duty_cycle}%` : "--%";
+      document.getElementById("led-color-label").textContent = (res.color_name || "--").toUpperCase();
+
+      const rgb = res.dominant_rgb || [0, 0, 0];
+      const swatch = document.getElementById("led-swatch-display");
+      if (swatch) swatch.style.background = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    } catch (e) {
+      alert("LED analysis failed: " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Analyze Blink / Frequency";
+    }
+  });
+
+  // Camera Optics Controls & Sliders
+  const ctrlBrightness = document.getElementById("ctrl-brightness");
+  const ctrlContrast = document.getElementById("ctrl-contrast");
+  const ctrlExposure = document.getElementById("ctrl-exposure");
+
+  async function applyOpticsSettings(settings) {
+    try {
+      await api(`/api/cameras/${currentCameraId || "0"}/controls`, {
+        method: "POST",
+        body: JSON.stringify(settings),
+      });
+    } catch (e) {
+      console.warn("Optics setting failed:", e);
+    }
+  }
+
+  ctrlBrightness?.addEventListener("change", (e) => {
+    const v = parseInt(e.target.value, 10);
+    document.getElementById("val-ctrl-brightness").textContent = v;
+    applyOpticsSettings({ brightness: v });
+  });
+
+  ctrlContrast?.addEventListener("change", (e) => {
+    const v = parseInt(e.target.value, 10);
+    document.getElementById("val-ctrl-contrast").textContent = v;
+    applyOpticsSettings({ contrast: v });
+  });
+
+  ctrlExposure?.addEventListener("change", (e) => {
+    const v = parseInt(e.target.value, 10);
+    document.getElementById("val-ctrl-exposure").textContent = v;
+    applyOpticsSettings({ exposure: v, lock_auto: true });
+  });
+
+  document.getElementById("preset-anti-glare")?.addEventListener("click", () => {
+    if (ctrlBrightness) ctrlBrightness.value = 110;
+    if (ctrlContrast) ctrlContrast.value = 160;
+    if (ctrlExposure) ctrlExposure.value = -7;
+    document.getElementById("val-ctrl-brightness").textContent = 110;
+    document.getElementById("val-ctrl-contrast").textContent = 160;
+    document.getElementById("val-ctrl-exposure").textContent = -7;
+    applyOpticsSettings({ brightness: 110, contrast: 160, exposure: -7, lock_auto: true });
+  });
+
+  document.getElementById("preset-pcb-contrast")?.addEventListener("click", () => {
+    if (ctrlBrightness) ctrlBrightness.value = 130;
+    if (ctrlContrast) ctrlContrast.value = 195;
+    if (ctrlExposure) ctrlExposure.value = -5;
+    document.getElementById("val-ctrl-brightness").textContent = 130;
+    document.getElementById("val-ctrl-contrast").textContent = 195;
+    document.getElementById("val-ctrl-exposure").textContent = -5;
+    applyOpticsSettings({ brightness: 130, contrast: 195, exposure: -5, lock_auto: true });
+  });
+
+  document.getElementById("preset-reset-optics")?.addEventListener("click", () => {
+    if (ctrlBrightness) ctrlBrightness.value = 128;
+    if (ctrlContrast) ctrlContrast.value = 128;
+    if (ctrlExposure) ctrlExposure.value = -5;
+    document.getElementById("val-ctrl-brightness").textContent = 128;
+    document.getElementById("val-ctrl-contrast").textContent = 128;
+    document.getElementById("val-ctrl-exposure").textContent = -5;
+    applyOpticsSettings({ brightness: 128, contrast: 128, lock_auto: false });
   });
 
   // Save Baseline

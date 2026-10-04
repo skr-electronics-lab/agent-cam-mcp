@@ -32,11 +32,13 @@ from agent_cam.adapters.mqtt_adapter import MqttAdapter
 from agent_cam.adapters.serial_adapter import SerialAdapter
 from agent_cam.analysis.baseline import BaselineManager
 from agent_cam.cameras.buffer import FrameBuffer
+from agent_cam.analysis.led import analyze_led_signal
+from agent_cam.analysis.regions import crop_region
 from agent_cam.cameras.manager import CameraManager
 from agent_cam.config import AgentCamConfig, get_lock_file, get_token_file
 from agent_cam.mcp_server.server import TOOL_DEFINITIONS, create_mcp_server
 from agent_cam.mcp_server.tools import MCPToolExecutor
-from agent_cam.models import PrivacyMask, Region
+from agent_cam.models import CameraSettings, PrivacyMask, Region
 from agent_cam.policy import PolicyEngine
 
 logger = logging.getLogger("agent_cam.daemon")
@@ -203,7 +205,7 @@ class DaemonServer:
             cams = self.camera_manager.list_cameras_info()
             return {
                 "status": "ok",
-                "version": "0.1.0",
+                "version": "0.1.1",
                 "uptime": round(time.time() - self.start_time, 1),
                 "cameras_count": len(cams),
                 "paused": self.policy_engine.is_paused,
@@ -276,6 +278,62 @@ class DaemonServer:
                 del self.config.regions[name]
                 self.config.save()
             return {"status": "deleted", "name": name}
+
+        @app.get("/api/regions/{name}/rectified")
+        async def get_rectified_region(name: str):
+            if name not in self.config.regions:
+                raise HTTPException(status_code=404, detail="Region not found")
+            reg = self.config.regions[name]
+            frame, _, _ = self.camera_manager.get_frame(reg.camera)
+            if frame is None:
+                raise HTTPException(status_code=503, detail="Camera frame unavailable")
+            warped, _ = crop_region(frame, reg)
+            ret, buf = cv2.imencode(".jpg", warped)
+            if not ret:
+                raise HTTPException(status_code=500, detail="Encoding failed")
+            return Response(content=buf.tobytes(), media_type="image/jpeg")
+
+        @app.post("/api/led/analyze")
+        async def api_analyze_led(request: Request):
+            self._verify_auth(request)
+            body = await request.json()
+            region_name = body.get("region")
+            camera_id = body.get("camera")
+            duration_s = max(0.5, min(5.0, float(body.get("duration_s", 1.5))))
+            reg = self.config.regions.get(region_name) if region_name else None
+            samples = []
+            start_t = time.time()
+            interval = 0.04
+            while time.time() - start_t < duration_s:
+                t_now = time.time()
+                f, _, _ = self.camera_manager.get_frame(camera_id)
+                if f is not None:
+                    if reg:
+                        crop, _ = crop_region(f, reg)
+                        samples.append((t_now, crop))
+                    else:
+                        samples.append((t_now, f))
+                await asyncio.sleep(interval)
+            cid = camera_id if camera_id else str(self.config.primary_camera)
+            res = analyze_led_signal(samples, cid, region_name)
+            return res.model_dump()
+
+        @app.post("/api/cameras/{camera_id}/controls")
+        async def api_camera_controls(camera_id: str, request: Request):
+            self._verify_auth(request)
+            body = await request.json()
+            settings = CameraSettings(
+                camera=camera_id,
+                exposure=body.get("exposure"),
+                focus=body.get("focus"),
+                brightness=body.get("brightness"),
+                contrast=body.get("contrast"),
+                gain=body.get("gain"),
+                white_balance=body.get("white_balance"),
+                lock_auto=body.get("lock_auto"),
+            )
+            res = self.camera_manager.set_camera_settings(settings)
+            return res.model_dump()
 
         @app.get("/api/privacy_masks")
         async def list_privacy_masks():

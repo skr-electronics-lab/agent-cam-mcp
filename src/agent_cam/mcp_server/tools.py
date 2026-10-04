@@ -16,6 +16,7 @@ import numpy as np
 from agent_cam.adapters.actions import ActionRunner
 from agent_cam.adapters.base import BaseAdapter
 from agent_cam.analysis.baseline import BaselineManager
+from agent_cam.analysis.led import analyze_led_signal
 from agent_cam.analysis.metrics import calculate_metrics
 from agent_cam.analysis.ocr import OCRError, perform_ocr
 from agent_cam.analysis.regions import annotate_regions, crop_region
@@ -27,6 +28,7 @@ from agent_cam.models import (
     CameraSettings,
     ErrorCode,
     EventLine,
+    LEDAnalysisResult,
     Region,
     RegionUnit,
     StructuredError,
@@ -127,6 +129,7 @@ class MCPToolExecutor:
             "get_timeline",
             "watch",
             "compare_to_baseline",
+            "rectify_region",
         }
         if name in image_tools:
             rate_err = self.policy_engine.check_rate_limit(client_id, is_image_call=True)
@@ -518,15 +521,36 @@ class MCPToolExecutor:
                 retryable=False,
             )
 
-        x = float(args.get("x", 0.0))
-        y = float(args.get("y", 0.0))
-        w = float(args.get("w", 0.0))
-        h = float(args.get("h", 0.0))
+        points = args.get("points")
+        parent = args.get("parent")
+        if points and len(points) == 4:
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            x = float(min(xs))
+            y = float(min(ys))
+            w = float(max(xs) - x)
+            h = float(max(ys) - y)
+        else:
+            x = float(args.get("x", 0.0))
+            y = float(args.get("y", 0.0))
+            w = float(args.get("w", 0.0))
+            h = float(args.get("h", 0.0))
+
         units_str = str(args.get("units", "normalized")).lower()
         units = RegionUnit.PIXELS if units_str == "pixels" else RegionUnit.NORMALIZED
         camera = args.get("camera")
 
-        reg = Region(name=name, x=x, y=y, w=w, h=h, camera=camera, units=units)
+        reg = Region(
+            name=name,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            camera=camera,
+            units=units,
+            points=points,
+            parent=parent,
+        )
         self.config.regions[name] = reg
         self.config.save()
 
@@ -760,6 +784,8 @@ class MCPToolExecutor:
             exposure=args.get("exposure"),
             focus=args.get("focus"),
             brightness=args.get("brightness"),
+            contrast=args.get("contrast"),
+            gain=args.get("gain"),
             white_balance=args.get("white_balance"),
             lock_auto=args.get("lock_auto"),
         )
@@ -770,6 +796,103 @@ class MCPToolExecutor:
             ),
             None,
             f"Negotiated camera settings for {camera_id}",
+        )
+
+    async def tool_analyze_led(
+        self, args: Dict[str, Any], client_id: str
+    ) -> Tuple[types.CallToolResult, Optional[bytes], str]:
+        camera_id = args.get("camera")
+        region_name = args.get("region")
+        duration_s = max(0.5, min(5.0, float(args.get("duration_s", 1.5))))
+        target_fps = max(10.0, min(60.0, float(args.get("fps", 25.0))))
+
+        reg = self.config.regions.get(region_name) if region_name else None
+        if region_name and not reg:
+            raise StructuredError(
+                error_code=ErrorCode.REGION_NOT_FOUND.value,
+                message=f"Region '{region_name}' is not defined.",
+                fix="Verify region name with list_regions or omit to analyze full frame.",
+                retryable=False,
+            )
+
+        samples: List[Tuple[float, np.ndarray]] = []
+        start_t = time.time()
+        interval = 1.0 / target_fps
+
+        while time.time() - start_t < duration_s:
+            t_now = time.time()
+            f, _, actual_cid = await asyncio.to_thread(self.camera_manager.get_frame, camera_id)
+            if f is not None:
+                if reg:
+                    crop, _ = crop_region(f, reg)
+                    samples.append((t_now, crop))
+                else:
+                    samples.append((t_now, f))
+            await asyncio.sleep(interval)
+
+        cid_str = camera_id if camera_id else str(self.config.primary_camera)
+        led_res = await asyncio.to_thread(analyze_led_signal, samples, cid_str, region_name)
+
+        preview_bytes = None
+        if samples:
+            _, buf = cv2.imencode(".jpg", samples[-1][1])
+            preview_bytes = buf.tobytes()
+
+        return (
+            types.CallToolResult(
+                content=[types.TextContent(type="text", text=led_res.model_dump_json(indent=2))]
+            ),
+            preview_bytes,
+            f"LED state: {led_res.state} (color={led_res.color_name}, freq={led_res.frequency_hz}Hz)",
+        )
+
+    async def tool_rectify_region(
+        self, args: Dict[str, Any], client_id: str
+    ) -> Tuple[types.CallToolResult, Optional[bytes], str]:
+        camera_id = args.get("camera")
+        region_name = str(args.get("region", "")).strip()
+        if not region_name or region_name not in self.config.regions:
+            raise StructuredError(
+                error_code=ErrorCode.REGION_NOT_FOUND.value,
+                message=f"Region '{region_name}' is not defined.",
+                fix="Specify a valid region name from list_regions.",
+                retryable=False,
+            )
+
+        reg = self.config.regions[region_name]
+        frame, _, actual_cid = await asyncio.to_thread(self.camera_manager.get_frame, camera_id)
+        if frame is None:
+            raise StructuredError(
+                error_code=ErrorCode.NO_CAMERAS.value,
+                message="Camera frame unavailable for rectification.",
+                fix="Check camera status.",
+                retryable=True,
+            )
+
+        warped, _ = crop_region(frame, reg)
+        fmt = str(args.get("format", "jpeg")).lower()
+        ext = ".png" if fmt == "png" else ".jpg"
+        mime = "image/png" if fmt == "png" else "image/jpeg"
+
+        ret, buf = cv2.imencode(ext, warped)
+        img_bytes = buf.tobytes()
+        b64_str = base64.b64encode(img_bytes).decode("ascii")
+
+        wh = {
+            "width": warped.shape[1],
+            "height": warped.shape[0],
+            "region": region_name,
+            "has_points": bool(reg.points and len(reg.points) == 4),
+        }
+        return (
+            types.CallToolResult(
+                content=[
+                    types.TextContent(type="text", text=json.dumps(wh, indent=2)),
+                    types.ImageContent(type="image", data=b64_str, mimeType=mime),
+                ]
+            ),
+            img_bytes,
+            f"Rectified {region_name} ({warped.shape[1]}x{warped.shape[0]})",
         )
 
     async def tool_read_events(

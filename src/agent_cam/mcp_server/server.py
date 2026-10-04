@@ -183,8 +183,8 @@ TOOL_DEFINITIONS = [
     types.Tool(
         name="define_region",
         description=(
-            "Define and save a named region of interest (e.g. 'status_led', 'oled_screen', 'nozzle_area') "
-            "using normalized coordinates (0.0 to 1.0) or pixels."
+            "Define and save a named region of interest (e.g. 'status_led', 'oled_screen', 'pixgen32') "
+            "using normalized coordinates (0.0 to 1.0) or 4 corner points for perspective homography."
         ),
         inputSchema={
             "type": "object",
@@ -194,6 +194,22 @@ TOOL_DEFINITIONS = [
                 "y": {"type": "number", "description": "Top-left Y coordinate"},
                 "w": {"type": "number", "description": "Region width"},
                 "h": {"type": "number", "description": "Region height"},
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 2,
+                        "maxItems": 2,
+                    },
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "description": "Optional 4 corner points [[x1,y1], [x2,y2], [x3,y3], [x4,y4]] for perspective unwarping",
+                },
+                "parent": {
+                    "type": "string",
+                    "description": "Optional parent region name for hierarchical grouping",
+                },
                 "camera": {"type": "string", "description": "Optional camera ID to bind region to"},
                 "units": {
                     "type": "string",
@@ -202,7 +218,7 @@ TOOL_DEFINITIONS = [
                     "default": "normalized",
                 },
             },
-            "required": ["name", "x", "y", "w", "h"],
+            "required": ["name"],
             "additionalProperties": False,
         },
     ),
@@ -300,10 +316,57 @@ TOOL_DEFINITIONS = [
         },
     ),
     types.Tool(
+        name="rectify_region",
+        description=(
+            "Capture and perspective-correct (unwarp/rectify) an angled hardware region or screen into a "
+            "flat, orthogonal top-down image. Returns the rectified image for high-precision inspection or OCR."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "region": {"type": "string", "description": "Name of the defined region to rectify"},
+                "camera": {"type": "string", "description": "Camera ID (default: primary camera)"},
+                "format": {
+                    "type": "string",
+                    "enum": ["jpeg", "png"],
+                    "description": "Image format (default jpeg)",
+                    "default": "jpeg",
+                },
+            },
+            "required": ["region"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="analyze_led",
+        description=(
+            "Sample high-speed frames of an LED or indicator to detect state (solid_on, blinking, off), "
+            "blink frequency in Hz, duty cycle, and exact perceived color (red, green, blue, amber, etc.)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "camera": {"type": "string", "description": "Camera ID (default: primary camera)"},
+                "region": {"type": "string", "description": "Optional named region covering the LED"},
+                "duration_s": {
+                    "type": "number",
+                    "description": "Sampling window in seconds (default 1.5, range 0.5 to 5.0)",
+                    "default": 1.5,
+                },
+                "fps": {
+                    "type": "number",
+                    "description": "Sampling frame rate in FPS (default 25.0, range 10 to 60)",
+                    "default": 25.0,
+                },
+            },
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="set_camera_settings",
         description=(
-            "Adjust hardware camera parameters: exposure, focus, brightness, white balance, or lock auto settings. "
-            "Reports exactly which parameters were accepted vs rejected by the driver."
+            "Adjust hardware camera parameters: exposure, focus, brightness, contrast, gain, white balance, "
+            "or lock auto settings. Reports exactly which parameters were accepted vs rejected by the driver."
         ),
         inputSchema={
             "type": "object",
@@ -312,6 +375,8 @@ TOOL_DEFINITIONS = [
                 "exposure": {"type": "integer", "description": "Manual exposure value"},
                 "focus": {"type": "integer", "description": "Manual focus value"},
                 "brightness": {"type": "integer", "description": "Brightness value"},
+                "contrast": {"type": "integer", "description": "Contrast value"},
+                "gain": {"type": "integer", "description": "Gain value"},
                 "white_balance": {"type": "integer", "description": "White balance value"},
                 "lock_auto": {
                     "type": "boolean",

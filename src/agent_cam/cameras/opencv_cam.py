@@ -69,6 +69,9 @@ def probe_single_camera_index(
         try:
             cap = cv2.VideoCapture(index, backend)
             if cap.isOpened():
+                # Probe for sensor native high resolution (up to 1080p FHD)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
                 ret, frame = cap.read()
                 if ret and frame is not None:
                     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or frame.shape[1]
@@ -169,9 +172,10 @@ class OpenCVCamera(BaseCamera):
             self._cap.set(cv2.CAP_PROP_FOURCC, fourcc)
 
             # Request resolution
-            if self.info.width > 0 and self.info.height > 0:
-                self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.info.width)
-                self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.info.height)
+            req_w = self.info.width if self.info.width > 640 else 1920
+            req_h = self.info.height if self.info.height > 480 else 1080
+            self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, req_w)
+            self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, req_h)
             if self.info.fps > 0:
                 self._cap.set(cv2.CAP_PROP_FPS, self.info.fps)
 
@@ -243,6 +247,20 @@ class OpenCVCamera(BaseCamera):
                 applied["brightness"] = settings.brightness
             else:
                 ignored["brightness"] = "Driver rejected CAP_PROP_BRIGHTNESS"
+
+        if settings.contrast is not None:
+            ret = self._cap.set(cv2.CAP_PROP_CONTRAST, float(settings.contrast))
+            if ret:
+                applied["contrast"] = settings.contrast
+            else:
+                ignored["contrast"] = "Driver rejected CAP_PROP_CONTRAST"
+
+        if settings.gain is not None:
+            ret = self._cap.set(cv2.CAP_PROP_GAIN, float(settings.gain))
+            if ret:
+                applied["gain"] = settings.gain
+            else:
+                ignored["gain"] = "Driver rejected CAP_PROP_GAIN"
 
         if settings.lock_auto is not None:
             # 0.25 manual, 0.75 auto on DirectShow

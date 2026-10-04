@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Cam MCP Tool - Console</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=0.1.1">
 </head>
 <body>
   <!-- Top Bar -->
   <header class="top-bar">
     <div class="brand">
       <span>Agent Cam MCP</span>
-      <span class="brand-badge" id="daemon-version">v0.1.0</span>
+      <span class="brand-badge" id="daemon-version">v0.1.1</span>
     </div>
 
     <div class="top-controls">
@@ -101,6 +101,7 @@
                 <div class="btn-group" style="display:flex; gap:4px;">
                   <button id="mode-select" class="btn btn-sm active">Select</button>
                   <button id="mode-draw-region" class="btn btn-sm">Draw Region</button>
+                  <button id="mode-draw-quad" class="btn btn-sm" title="Define 4-corner perspective warp region">Draw Quad (Warp)</button>
                   <button id="mode-draw-mask" class="btn btn-sm">Draw Privacy Mask</button>
                 </div>
                 <div style="display:flex; align-items:center; gap:4px; margin-left:8px;">
@@ -119,6 +120,31 @@
               </div>
             </div>
 
+            <!-- Interactive Optics & Exposure Controls Strip -->
+            <div class="camera-controls-strip">
+              <div style="font-weight:600; color:var(--text); margin-right:4px;">Optics:</div>
+              <div class="control-slider-group">
+                <label for="ctrl-brightness">Bright:</label>
+                <input type="range" id="ctrl-brightness" min="0" max="255" value="128">
+                <span class="control-val-badge" id="val-ctrl-brightness">128</span>
+              </div>
+              <div class="control-slider-group">
+                <label for="ctrl-contrast">Contrast:</label>
+                <input type="range" id="ctrl-contrast" min="0" max="255" value="128">
+                <span class="control-val-badge" id="val-ctrl-contrast">128</span>
+              </div>
+              <div class="control-slider-group">
+                <label for="ctrl-exposure">Exposure:</label>
+                <input type="range" id="ctrl-exposure" min="-11" max="0" value="-6">
+                <span class="control-val-badge" id="val-ctrl-exposure">-6</span>
+              </div>
+              <div style="display:flex; gap:4px; margin-left:auto;">
+                <button id="preset-anti-glare" class="btn btn-sm" title="Optimize for LCD/TFT glossy displays">Anti-Glare LCD</button>
+                <button id="preset-pcb-contrast" class="btn btn-sm" title="Maximize trace & component contrast">PCB Contrast</button>
+                <button id="preset-reset-optics" class="btn btn-sm">Reset</button>
+              </div>
+            </div>
+
             <div class="viewport-container" id="stream-container">
               <div class="stream-wrapper" id="stream-wrapper">
                 <img id="mjpeg-stream" src="/stream/0" alt="Camera Stream" />
@@ -127,6 +153,7 @@
                 <div id="region-naming-dialog" class="floating-dialog" style="display:none;">
                   <div class="dialog-title" id="dialog-title">Name New Region</div>
                   <input type="text" id="dialog-region-name" placeholder="e.g. status_led, bed_center" />
+                  <input type="text" id="dialog-region-parent" placeholder="Parent group (optional, e.g. pixgen32)" style="margin-top:6px;" />
                   <div class="dialog-actions">
                     <button id="dialog-cancel-btn" class="btn btn-sm">Cancel</button>
                     <button id="dialog-save-btn" class="btn btn-sm btn-primary">Save Region</button>
@@ -155,6 +182,37 @@
                 </select>
               </div>
               <button id="btn-run-measure" class="btn btn-primary btn-sm" style="width:100%;">Run Measure</button>
+            </div>
+
+            <!-- Rectified Orthogonal Warp Preview -->
+            <div class="inspector-section" id="rectified-preview-section" style="display:none;">
+              <h4>Rectified Orthogonal View</h4>
+              <div class="rectified-preview-card">
+                <img id="rectified-preview-img" class="rectified-img" src="" alt="Rectified View" />
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:11px;">
+                  <span id="rectified-res-label">-- x --</span>
+                  <button id="btn-refresh-rectified" class="btn btn-sm">Refresh Warp</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live LED / Frequency Analyzer -->
+            <div class="inspector-section">
+              <h4>LED & State Analyzer</h4>
+              <div class="led-analysis-card">
+                <div class="led-status-row">
+                  <div>
+                    <span class="led-color-swatch" id="led-swatch-display" style="background:#555;"></span>
+                    <strong id="led-state-label">IDLE</strong>
+                  </div>
+                  <span id="led-freq-label" class="num-cell" style="font-weight:600;">-- Hz</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:8px;">
+                  <span>Duty Cycle: <strong id="led-duty-label" class="num-cell">--%</strong></span>
+                  <span>Color: <strong id="led-color-label">--</strong></span>
+                </div>
+                <button id="btn-run-led-analysis" class="btn btn-sm btn-primary" style="width:100%;">Analyze Blink / Frequency</button>
+              </div>
             </div>
 
             <div class="inspector-section">
@@ -413,6 +471,6 @@ Always verify physical hardware state before reporting success:
     </div>
   </div>
 
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=0.1.1"></script>
 </body>
 </html>

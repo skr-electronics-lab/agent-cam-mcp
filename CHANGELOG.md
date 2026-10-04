@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-04
+
+### Added
+- 4-point quadrilateral perspective unwarping (`rectify_region` tool) using planar homography for oblique displays and surfaces.
+- High-speed LED signal and blink frequency analyzer (`analyze_led` tool) computing frequency in Hz, duty cycle %, and color classification.
+- Real-time optics and anti-glare control strip in dashboard (brightness, contrast, manual exposure, and hardware presets for LCD and PCB contrast).
+- Rectified orthogonal view card in Web UI inspector with live perspective preview.
+- Resolution auto-negotiation prioritizing native FHD (1080p) and HD (720p) profiles over 640x480.
+
+### Fixed
+- Fixed canvas mouse event handler in Web UI restoring interactive drawing for regions and privacy masks.
+- Added asset cache-busting query parameters to ensure browser dashboards immediately load updated frontend logic.
+- Resolved Windows DirectShow device opening stability with buffer pacing.
+
 ## [0.1.0] - 2026-10-04
 
 ### Added
