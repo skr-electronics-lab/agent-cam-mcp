@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import base64
-import sys
-from pathlib import Path
-from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.client.session import ClientSession
+import json
+
 import cv2
 import numpy as np
+from mcp.client.session import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
 async def verify_mcp_command():
-    exe_path = r"D:\Projects\mcp-tool-development\agent-cam-mcp-tool\.venv\Scripts\agent-cam-mcp.exe"
+    exe_path = (
+        r"D:\Projects\mcp-tool-development\agent-cam-mcp-tool\.venv\Scripts\agent-cam-mcp.exe"
+    )
     print(f"Connecting to installed command: {exe_path}")
 
     server_params = StdioServerParameters(
@@ -27,7 +28,9 @@ async def verify_mcp_command():
         async with ClientSession(read_stream, write_stream) as session:
             # 1. Initialize
             init_res = await session.initialize()
-            print(f"1. initialize result: serverName={init_res.serverInfo.name} version={init_res.serverInfo.version}")
+            print(
+                f"1. initialize result: serverName={init_res.serverInfo.name} version={init_res.serverInfo.version}"
+            )
 
             # 2. List tools
             tools_res = await session.list_tools()
@@ -38,11 +41,15 @@ async def verify_mcp_command():
             status_res = await session.call_tool("get_status", {})
             print(f"3. get_status call: isError={status_res.isError}")
             status_data = json.loads(status_res.content[0].text)
-            print(f"   Uptime: {status_data['uptime_seconds']}s, Cameras: {len(status_data['cameras'])}, Paused: {status_data['paused_by_user']}")
+            print(
+                f"   Uptime: {status_data['uptime_seconds']}s, Cameras: {len(status_data['cameras'])}, Paused: {status_data['paused_by_user']}"
+            )
 
             # 4. Call capture_image
             cap_res = await session.call_tool("capture_image", {"width": 640})
-            print(f"4. capture_image call: isError={cap_res.isError}, contents={len(cap_res.content)}")
+            print(
+                f"4. capture_image call: isError={cap_res.isError}, contents={len(cap_res.content)}"
+            )
             has_valid_image = False
             for c in cap_res.content:
                 if hasattr(c, "data") and c.type == "image":
