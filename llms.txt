@@ -1,0 +1,28 @@
+# Agent Cam MCP Tool
+> Physical camera perception, quantitative measurement, and verification tool for MCP AI agents.
+
+## Project Summary
+Agent Cam MCP Tool connects local USB webcams and RTSP/HTTP network camera streams to MCP-capable AI agents (Antigravity, Claude Code, Cursor, Codex).
+
+## MCP Contract
+- Server Name: `agent-cam`
+- Protocol: Model Context Protocol (MCP) over Stdio or Streamable HTTP/SSE
+- Default Daemon: `http://127.0.0.1:8765/`
+
+## Key Tools
+- `get_status`: Daemon uptime, camera states, pause flags, active connections.
+- `list_cameras`: Enumeration of physical USB and IP camera streams.
+- `capture_image`: Live camera capture returning direct base64 MCP ImageContent.
+- `capture_sequence`: Multi-frame sequence rendered into a contact sheet.
+- `get_timeline`: Historical buffer contact sheet aligned with adapter events.
+- `measure`: Numerical metrics: brightness, contrast, lit %, edge density, sharpness, motion.
+- `watch`: Condition watch loop waiting for visual changes with timeouts.
+- `define_region` / `list_regions` / `delete_region`: Region of interest management.
+- `save_baseline` / `compare_to_baseline`: SSIM similarity scoring and difference heatmaps.
+- `read_events`: Read timestamped lines from serial, logfiles, or MQTT.
+- `run_action`: Allowlisted action execution without shell evaluation.
+
+## Client Registration
+- Antigravity: `agent-cam-mcp install --client antigravity`
+- Cursor: `agent-cam-mcp install --client cursor`
+- Claude Code: `claude mcp add agent-cam -- <absolute_path>`

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Cam MCP Tool - Console</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <div class="brand">
+      <span>Agent Cam MCP</span>
+      <span class="brand-badge" id="daemon-version">v0.1.0</span>
+    </div>
+
+    <div class="top-controls">
+      <div class="status-pill">
+        <span class="status-dot" id="daemon-dot"></span>
+        <span id="daemon-text">Connected</span>
+      </div>
+
+      <div class="status-pill">
+        <span>Agents:</span>
+        <strong id="active-agents-count" class="num-cell">0</strong>
+      </div>
+
+      <div class="status-pill">
+        <span>Buffer:</span>
+        <span id="buffer-metric" class="num-cell">0.0s (0MB)</span>
+      </div>
+
+      <button id="pause-toggle-btn" class="pause-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="6" y="4" width="4" height="16"></rect>
+          <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+        <span id="pause-btn-label">Pause Agent Access</span>
+      </button>
+
+      <button id="theme-toggle-btn" class="btn btn-sm">Theme</button>
+    </div>
+  </header>
+
+  <!-- App Layout -->
+  <div class="app-container">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <ul class="nav-list">
+        <li class="nav-item active" data-view="live">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+          <span>Live</span>
+        </li>
+        <li class="nav-item" data-view="cameras">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Cameras</span>
+        </li>
+        <li class="nav-item" data-view="timeline">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Timeline</span>
+        </li>
+        <li class="nav-item" data-view="activity">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          <span>Activity</span>
+        </li>
+        <li class="nav-item" data-view="baselines">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <span>Baselines</span>
+        </li>
+        <li class="nav-item" data-view="adapters">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          <span>Adapters</span>
+        </li>
+        <li class="nav-item" data-view="connect">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          <span>Connect</span>
+        </li>
+        <li class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+          <span>Settings</span>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div>Host: 127.0.0.1:8765</div>
+        <div id="sidebar-uptime">Uptime: 0s</div>
+      </div>
+    </nav>
+
+    <!-- Main Views Container -->
+    <main class="main-view">
+      <!-- 1. LIVE VIEW -->
+      <section id="view-live" class="view-panel active">
+        <div class="live-layout">
+          <!-- Viewport Column -->
+          <div class="viewport-card">
+            <div class="card-header">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <label for="camera-select">Camera:</label>
+                <select id="camera-select"></select>
+                <button id="mode-draw-region" class="btn btn-sm">Draw Region</button>
+                <button id="mode-draw-mask" class="btn btn-sm">Draw Privacy Mask</button>
+              </div>
+              <div id="stream-stats" style="font-family:var(--font-mono); font-size:12px;">
+                FPS: <span id="val-fps">0</span> | Latency: <span id="val-latency">0ms</span>
+              </div>
+            </div>
+
+            <div class="viewport-container" id="stream-container">
+              <img id="mjpeg-stream" src="/stream/0" alt="Camera Stream" />
+              <canvas id="region-canvas"></canvas>
+            </div>
+
+            <div class="viewport-footer">
+              <span id="canvas-status-hint">Click and drag on preview to draw a region box.</span>
+              <button id="btn-save-as-baseline" class="btn btn-sm">Save Current Frame as Baseline</button>
+            </div>
+          </div>
+
+          <!-- Inspector Column -->
+          <div class="inspector-card">
+            <div class="inspector-section">
+              <h4>Active Inspection</h4>
+              <div style="margin-bottom:8px;">
+                <label style="font-size:11px; color:var(--muted);">Selected Region:</label>
+                <select id="inspector-region-select" style="width:100%; margin-top:4px;">
+                  <option value="">[Whole Frame]</option>
+                </select>
+              </div>
+              <button id="btn-run-measure" class="btn btn-primary btn-sm" style="width:100%;">Run Measure</button>
+            </div>
+
+            <div class="inspector-section">
+              <h4>Live Measurements</h4>
+              <div class="metrics-grid">
+                <div class="metric-box">
+                  <div class="metric-label">Mean Brightness</div>
+                  <div class="metric-val" id="m-brightness">--</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Contrast (StdDev)</div>
+                  <div class="metric-val" id="m-contrast">--</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Lit Pixels %</div>
+                  <div class="metric-val" id="m-lit-pct">--</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Edge Density %</div>
+                  <div class="metric-val" id="m-edges">--</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Sharpness (Lapl.)</div>
+                  <div class="metric-val" id="m-sharpness">--</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Motion Level</div>
+                  <div class="metric-val" id="m-motion">--</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="inspector-section">
+              <h4>Defined Regions</h4>
+              <ul id="defined-regions-list" style="list-style:none; display:flex; flex-direction:column; gap:6px;"></ul>
+            </div>
+
+            <div class="inspector-section">
+              <h4>Privacy Masks</h4>
+              <ul id="privacy-masks-list" style="list-style:none; display:flex; flex-direction:column; gap:6px;"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. CAMERAS VIEW -->
+      <section id="view-cameras" class="view-panel">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3>Connected Cameras</h3>
+            <button id="btn-refresh-cameras" class="btn btn-sm">Refresh Devices</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Resolution</th>
+                <th>FPS</th>
+                <th>State</th>
+                <th>Last Error / Diagnostics</th>
+              </tr>
+            </thead>
+            <tbody id="cameras-table-body"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Add Network Stream (RTSP / HTTP / MJPEG)</h3>
+          <form id="add-ip-cam-form" style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+            <input type="text" id="ip-cam-name" placeholder="Camera Name (e.g. Bench RTSP)" required />
+            <input type="text" id="ip-cam-url" placeholder="rtsp://192.168.1.50:554/live or http://..." style="flex:1;" required />
+            <button type="submit" class="btn btn-primary">Add IP Camera</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 3. TIMELINE VIEW -->
+      <section id="view-timeline" class="view-panel">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3>RAM Buffer Scrub & Timeline</h3>
+            <div style="display:flex; gap:8px;">
+              <select id="timeline-window-select">
+                <option value="15">Last 15 seconds</option>
+                <option value="30" selected>Last 30 seconds</option>
+                <option value="60">Last 60 seconds</option>
+              </select>
+              <button id="btn-load-timeline" class="btn btn-primary btn-sm">Fetch Timeline</button>
+            </div>
+          </div>
+          <div id="timeline-container" style="text-align:center; padding:10px;">
+            <img id="timeline-img" style="max-width:100%; border:1px solid var(--border); border-radius:var(--radius);" />
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. ACTIVITY AUDIT VIEW -->
+      <section id="view-activity" class="view-panel">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3>Agent Call Audit Trail</h3>
+            <button id="btn-refresh-activity" class="btn btn-sm">Refresh</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Client</th>
+                <th>Tool</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Summary</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody id="activity-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5. BASELINES VIEW -->
+      <section id="view-baselines" class="view-panel">
+        <div class="card">
+          <h3>Saved Golden Baselines</h3>
+          <table class="data-table" style="margin-top:10px;">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Camera</th>
+                <th>Region</th>
+                <th>Created At</th>
+                <th>Resolution</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="baselines-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. ADAPTERS & ACTIONS VIEW -->
+      <section id="view-adapters" class="view-panel">
+        <div class="card">
+          <h3>Pending Action Approvals</h3>
+          <div id="approvals-container" style="margin-top:10px;">
+            <p style="color:var(--muted);">No actions currently pending approval.</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Event Adapters Status</h3>
+          <table class="data-table" style="margin-top:10px;">
+            <thead>
+              <tr>
+                <th>Adapter</th>
+                <th>Type</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody id="adapters-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 7. CONNECT CARDS -->
+      <section id="view-connect" class="view-panel">
+        <div class="card">
+          <h3>Client Configuration Snippets</h3>
+          <p style="color:var(--muted); margin-bottom:12px;">
+            Register Agent Cam in your AI IDE or client config using absolute launcher paths.
+          </p>
+
+          <h4 style="margin-top:14px;">Antigravity IDE (mcp_config.json)</h4>
+          <div class="code-block" id="snippet-antigravity">
+{
+  "mcpServers": {
+    "agent-cam": {
+      "command": "agent-cam-mcp",
+      "args": [],
+      "env": {},
+      "disabled": false
+    }
+  }
+}
+            <button class="btn btn-sm copy-btn" data-target="snippet-antigravity">Copy</button>
+          </div>
+
+          <h4 style="margin-top:14px;">Claude Code</h4>
+          <div class="code-block" id="snippet-claude">
+claude mcp add agent-cam -- agent-cam-mcp
+            <button class="btn btn-sm copy-btn" data-target="snippet-claude">Copy</button>
+          </div>
+
+          <h4 style="margin-top:14px;">Recommended Prompt Snippet (AGENTS.md / GEMINI.md)</h4>
+          <div class="code-block" id="snippet-agents-md">
+# Physical Verification Policy
+Always verify physical hardware state before reporting success:
+- Use `agent-cam` MCP tools (`get_status`, `capture_image`, `measure`, `watch`).
+- Quote exact observed numbers and evidence.
+- Never assume success based solely on build or flash logs.
+            <button class="btn btn-sm copy-btn" data-target="snippet-agents-md">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. SETTINGS VIEW -->
+      <section id="view-settings" class="view-panel">
+        <div class="card">
+          <h3>Daemon & Perception Settings</h3>
+          <form id="settings-form" style="display:flex; flex-direction:column; gap:14px; max-width:600px; margin-top:14px;">
+            <div>
+              <label style="display:block; font-weight:500; margin-bottom:4px;">Default Capture Width (px)</label>
+              <input type="number" id="cfg-image-width" min="320" max="3840" style="width:100%;" />
+            </div>
+            <div>
+              <label style="display:block; font-weight:500; margin-bottom:4px;">JPEG Compression Quality (10-100)</label>
+              <input type="number" id="cfg-jpeg-quality" min="10" max="100" style="width:100%;" />
+            </div>
+            <div>
+              <label style="display:block; font-weight:500; margin-bottom:4px;">Idle Camera Release Timeout (seconds)</label>
+              <input type="number" id="cfg-idle-seconds" min="5" max="3600" style="width:100%;" />
+            </div>
+            <div>
+              <label style="display:block; font-weight:500; margin-bottom:4px;">Action Approval Policy</label>
+              <select id="cfg-approval-mode" style="width:100%;">
+                <option value="actions_only">Actions Only (Require approval for allowlisted commands)</option>
+                <option value="every_capture">Every Capture (Prompt user before any capture)</option>
+                <option value="off">Off (Unrestricted allowlisted execution)</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Save Settings</button>
+          </form>
+
+          <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;" />
+
+          <h3>System Self-Diagnosis</h3>
+          <button id="btn-run-doctor-dashboard" class="btn" style="margin-top:10px;">Run Doctor Diagnostics</button>
+          <div id="doctor-results" style="margin-top:10px; font-family:var(--font-mono); font-size:12px; white-space:pre-wrap;"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Image Viewer Modal -->
+  <div id="image-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modal-title">Evidence Image</span>
+        <button id="modal-close" class="btn btn-sm">Close</button>
+      </div>
+      <div class="modal-body">
+        <img id="modal-img" class="modal-image" src="" alt="Evidence" />
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

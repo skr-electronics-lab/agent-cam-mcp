@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} - Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install package and dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev,serial,mqtt]"
+
+      - name: Run lint checks
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run test suite
+        run: |
+          uv run pytest -v
+
+      - name: Run doctor diagnostics with synthetic camera
+        run: |
+          uv run python -m agent_cam.cli --fake-camera doctor
+
+      - name: Build distribution packages
+        run: |
+          uv pip install build
+          uv run python -m build
