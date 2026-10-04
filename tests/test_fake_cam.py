@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
 
 from agent_cam.cameras.fake_cam import FakeCamera
@@ -22,24 +20,19 @@ def test_fake_camera_generation():
 
 def test_fake_camera_led_and_display_controls():
     cam = FakeCamera(camera_id="fake-0", width=640, height=480)
-    cam.start()
 
-    # Test LED ON
+    # Test indicator ON
     cam.set_led(state=True, blink_hz=0.0)
-    time.sleep(0.06)
-    f_on, _ = cam.get_latest_frame()
+    ret1, f_on = cam._read_device_frame()
+    assert ret1 and f_on is not None
 
-    # Test LED OFF
+    # Test indicator OFF
     cam.set_led(state=False, blink_hz=0.0)
-    time.sleep(0.06)
-    f_off, _ = cam.get_latest_frame()
+    ret2, f_off = cam._read_device_frame()
+    assert ret2 and f_off is not None
 
-    assert f_on is not None and f_off is not None
-    # Pixels around the LED should differ
     diff = float(np.mean(np.abs(f_on.astype(int) - f_off.astype(int))))
     assert diff > 0.0
-
-    cam.stop()
 
 
 def test_fake_camera_unplug_replug():

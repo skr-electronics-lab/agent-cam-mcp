@@ -83,47 +83,45 @@ class FakeCamera(BaseCamera):
         w = self.info.width
         h = self.info.height
 
-        # Base dark workbench background (RGB: ~24, 28, 36)
-        frame = np.full((h, w, 3), (32, 28, 24), dtype=np.uint8)
+        # Base neutral optical calibration background (dark slate gray: 30, 32, 36)
+        frame = np.full((h, w, 3), (36, 32, 30), dtype=np.uint8)
 
-        # Draw a grid pattern (workbench cutting mat)
+        # Draw optical alignment grid
         grid_step = 60
         for x in range(0, w, grid_step):
-            cv2.line(frame, (x, 0), (x, h), (45, 40, 35), 1)
+            cv2.line(frame, (x, 0), (x, h), (55, 50, 48), 1)
         for y in range(0, h, grid_step):
-            cv2.line(frame, (0, y), (w, y), (45, 40, 35), 1)
+            cv2.line(frame, (0, y), (w, y), (55, 50, 48), 1)
 
-        # Draw simulated PCB / Embedded board in center
-        board_x1, board_y1 = int(w * 0.25), int(h * 0.25)
-        board_x2, board_y2 = int(w * 0.75), int(h * 0.75)
-        # Dark green PCB surface
-        cv2.rectangle(frame, (board_x1, board_y1), (board_x2, board_y2), (20, 60, 20), -1)
-        cv2.rectangle(frame, (board_x1, board_y1), (board_x2, board_y2), (40, 100, 40), 2)
+        # Central target / reticle area
+        cx, cy = w // 2, h // 2
+        cv2.circle(frame, (cx, cy), 120, (70, 65, 60), 2)
+        cv2.circle(frame, (cx, cy), 60, (90, 85, 80), 1)
+        cv2.line(frame, (cx - 140, cy), (cx + 140, cy), (90, 85, 80), 1)
+        cv2.line(frame, (cx, cy - 140), (cx, cy + 140), (90, 85, 80), 1)
 
-        # PCB mounting holes
-        cv2.circle(frame, (board_x1 + 20, board_y1 + 20), 8, (180, 180, 180), -1)
-        cv2.circle(frame, (board_x2 - 20, board_y1 + 20), 8, (180, 180, 180), -1)
-        cv2.circle(frame, (board_x1 + 20, board_y2 - 20), 8, (180, 180, 180), -1)
-        cv2.circle(frame, (board_x2 - 20, board_y2 - 20), 8, (180, 180, 180), -1)
+        # Calibration color swatches along bottom
+        swatch_y1, swatch_y2 = h - 90, h - 40
+        colors = [
+            (220, 50, 50),  # Blue
+            (50, 200, 50),  # Green
+            (50, 50, 220),  # Red
+            (50, 220, 220),  # Yellow
+            (220, 50, 220),  # Magenta
+            (220, 220, 50),  # Cyan
+            (230, 230, 230),  # White
+            (40, 40, 40),  # Dark
+        ]
+        swatch_w = int(w * 0.7) // len(colors)
+        start_x = int(w * 0.15)
+        for i, col in enumerate(colors):
+            x1 = start_x + i * swatch_w
+            x2 = x1 + swatch_w - 4
+            cv2.rectangle(frame, (x1, swatch_y1), (x2, swatch_y2), col, -1)
+            cv2.rectangle(frame, (x1, swatch_y1), (x2, swatch_y2), (100, 100, 100), 1)
 
-        # Simulated MCU chip (black square)
-        chip_x1, chip_y1 = int(w * 0.42), int(h * 0.40)
-        chip_x2, chip_y2 = int(w * 0.58), int(h * 0.60)
-        cv2.rectangle(frame, (chip_x1, chip_y1), (chip_x2, chip_y2), (15, 15, 15), -1)
-        cv2.rectangle(frame, (chip_x1, chip_y1), (chip_x2, chip_y2), (60, 60, 60), 1)
-        cv2.putText(
-            frame,
-            "MCU-CORE",
-            (chip_x1 + 10, chip_y1 + 45),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (160, 160, 160),
-            1,
-            cv2.LINE_AA,
-        )
-
-        # Simulated Status LED
-        led_center = (board_x1 + 80, board_y1 + 80)
+        # Controllable test indicator light
+        indicator_center = (cx + 220, cy - 60)
         is_lit = False
         if self.led_blink_hz > 0:
             phase = (elapsed * self.led_blink_hz * 2 * math.pi) % (2 * math.pi)
@@ -132,48 +130,46 @@ class FakeCamera(BaseCamera):
             is_lit = self.led_state
 
         if is_lit:
-            # Bright cyan/blue or green LED
-            cv2.circle(frame, led_center, 12, (255, 200, 50), -1)
-            cv2.circle(frame, led_center, 18, (200, 150, 30), 2)
+            cv2.circle(frame, indicator_center, 16, (0, 220, 255), -1)
+            cv2.circle(frame, indicator_center, 22, (0, 160, 200), 2)
         else:
-            # Off state (dark olive)
-            cv2.circle(frame, led_center, 10, (30, 40, 20), -1)
-            cv2.circle(frame, led_center, 12, (50, 60, 40), 1)
+            cv2.circle(frame, indicator_center, 14, (30, 50, 60), -1)
+            cv2.circle(frame, indicator_center, 18, (60, 80, 90), 1)
 
         cv2.putText(
             frame,
-            "LED_STATUS",
-            (led_center[0] - 35, led_center[1] + 30),
+            "INDICATOR",
+            (indicator_center[0] - 32, indicator_center[1] + 36),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
-            (120, 120, 120),
+            (150, 150, 150),
             1,
             cv2.LINE_AA,
         )
 
-        # Simulated OLED Display
-        disp_x1, disp_y1 = board_x2 - 200, board_y1 + 50
-        disp_x2, disp_y2 = board_x2 - 40, board_y1 + 150
-        cv2.rectangle(frame, (disp_x1, disp_y1), (disp_x2, disp_y2), (10, 10, 10), -1)
-        cv2.rectangle(frame, (disp_x1, disp_y1), (disp_x2, disp_y2), (80, 80, 80), 1)
+        # Configurable display text panel
+        panel_x1, panel_y1 = cx - 280, cy + 30
+        panel_x2, panel_y2 = cx - 80, cy + 110
+        cv2.rectangle(frame, (panel_x1, panel_y1), (panel_x2, panel_y2), (20, 22, 26), -1)
+        cv2.rectangle(frame, (panel_x1, panel_y1), (panel_x2, panel_y2), (70, 75, 85), 1)
         if self.display_state:
             cv2.putText(
                 frame,
                 self.display_text,
-                (disp_x1 + 10, disp_y1 + 40),
+                (panel_x1 + 10, panel_y1 + 35),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
-                (0, 255, 255),
+                (200, 220, 240),
                 1,
                 cv2.LINE_AA,
             )
             cv2.putText(
                 frame,
-                f"T: {elapsed:.1f}s",
-                (disp_x1 + 10, disp_y1 + 75),
+                f"UPTIME: {elapsed:.1f}s",
+                (panel_x1 + 10, panel_y1 + 65),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.45,
-                (0, 200, 200),
+                (140, 160, 180),
                 1,
                 cv2.LINE_AA,
             )
