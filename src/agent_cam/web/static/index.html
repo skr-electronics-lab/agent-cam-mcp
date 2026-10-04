@@ -95,11 +95,24 @@
           <!-- Viewport Column -->
           <div class="viewport-card">
             <div class="card-header">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <label for="camera-select">Camera:</label>
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <label for="camera-select" style="font-weight:600;">Camera:</label>
                 <select id="camera-select"></select>
-                <button id="mode-draw-region" class="btn btn-sm">Draw Region</button>
-                <button id="mode-draw-mask" class="btn btn-sm">Draw Privacy Mask</button>
+                <div class="btn-group" style="display:flex; gap:4px;">
+                  <button id="mode-select" class="btn btn-sm active">Select</button>
+                  <button id="mode-draw-region" class="btn btn-sm">Draw Region</button>
+                  <button id="mode-draw-mask" class="btn btn-sm">Draw Privacy Mask</button>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; margin-left:8px;">
+                  <label for="zoom-select" style="font-size:12px; color:var(--muted);">Zoom:</label>
+                  <select id="zoom-select" style="padding:3px 6px; font-size:12px;">
+                    <option value="1">1.0x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2.0x</option>
+                    <option value="3">3.0x</option>
+                  </select>
+                </div>
+                <button id="btn-snapshot" class="btn btn-sm" title="Download snapshot">Snapshot</button>
               </div>
               <div id="stream-stats" style="font-family:var(--font-mono); font-size:12px;">
                 FPS: <span id="val-fps">0</span> | Latency: <span id="val-latency">0ms</span>
@@ -107,13 +120,27 @@
             </div>
 
             <div class="viewport-container" id="stream-container">
-              <img id="mjpeg-stream" src="/stream/0" alt="Camera Stream" />
-              <canvas id="region-canvas"></canvas>
+              <div class="stream-wrapper" id="stream-wrapper">
+                <img id="mjpeg-stream" src="/stream/0" alt="Camera Stream" />
+                <canvas id="region-canvas"></canvas>
+                <div id="stream-coords" class="stream-coords-badge" style="display:none;"></div>
+                <div id="region-naming-dialog" class="floating-dialog" style="display:none;">
+                  <div class="dialog-title" id="dialog-title">Name New Region</div>
+                  <input type="text" id="dialog-region-name" placeholder="e.g. status_led, bed_center" />
+                  <div class="dialog-actions">
+                    <button id="dialog-cancel-btn" class="btn btn-sm">Cancel</button>
+                    <button id="dialog-save-btn" class="btn btn-sm btn-primary">Save Region</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="viewport-footer">
-              <span id="canvas-status-hint">Click and drag on preview to draw a region box.</span>
-              <button id="btn-save-as-baseline" class="btn btn-sm">Save Current Frame as Baseline</button>
+              <span id="canvas-status-hint">Mode: SELECT. Click any region to inspect, move, or resize.</span>
+              <div style="display:flex; gap:8px;">
+                <button id="btn-delete-selected" class="btn btn-sm btn-danger" style="display:none;">Delete Selected Region</button>
+                <button id="btn-save-as-baseline" class="btn btn-sm">Save Frame as Baseline</button>
+              </div>
             </div>
           </div>
 
